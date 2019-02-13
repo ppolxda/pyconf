@@ -1,0 +1,16 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.doubanio.com/simple"
+verify_ssl = true
+
+[dev-packages]
+pylint = "*"
+pep8 = "*"
+autopep8 = "*"
+pyinstaller = "*"
+
+[packages]
+six = "*"
+
+[requires]
+python_version = "3.6"
