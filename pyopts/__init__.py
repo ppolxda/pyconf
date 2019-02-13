@@ -11,12 +11,13 @@ import six
 import json
 import codecs
 import argparse
+from logging import config as log_config
 try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
 
-
+BOOL_LIST = {'boolean', 'bool'}
 INT_LIST = {'int', 'int32', 'int64', 'uint16'}
 JSON_STRING = {'jsonString', 'json_string', 'jsonstring'}
 FLOAT_LIST = {'float', 'double', 'double8_4', 'double16_6', 'double36_14',
@@ -25,8 +26,8 @@ STRING_LIST = {'string', 'string4', 'string8', 'string12', 'string16',
                'string24', 'string32', 'string64', 'string128',
                'string256', 'string512'}
 BYTE_LIST = {'bytes', 'byte24'}
-OTHER_LIST = {'datetime', 'date', 'boolean', 'class', 'any'}
-ALL_TYPE_LIST = (INT_LIST | JSON_STRING | FLOAT_LIST |
+OTHER_LIST = {'datetime', 'date',  'class', 'any'}
+ALL_TYPE_LIST = (BOOL_LIST | INT_LIST | JSON_STRING | FLOAT_LIST |
                  STRING_LIST | BYTE_LIST | OTHER_LIST)
 
 
@@ -86,12 +87,12 @@ class FeildOption(object):
             return self.__str__()
 
     def __init__(self, name, field_type, desc, default=DefaultUndefine(),
-                 help_desc='',  update='false', maxlen=None,
+                 help_desc='', update='false', maxlen=None,
                  minlen=None, maxval=None, minval=None,
                  regix=None, optional=True,
                  opt_name=None, opt_short_name=None):
         assert field_type in ALL_TYPE_LIST
-        assert isinstance(name, six.string_types) and name.count('.') == 1
+        assert isinstance(name, six.string_types)
         self.name = name
         self.type = field_type
         self.desc = desc
@@ -103,20 +104,28 @@ class FeildOption(object):
                                     regix)
 
         self.real_type = self.typedefine_to_type()
-        self.opt_fsection = self.name.split('.')[0]
-        self.opt_fname = self.name.split('.')[1]
-
-        if isinstance(opt_name, six.string_types):
-            self.opt_aname = opt_name
-        else:
-            self.opt_aname = self.name.replace('.', '_')
-
         self.opt_short_name = opt_short_name
-        if self.opt_short_name:
-            self.opt_arguments = (
-                self.opt_short_name, '--{}'.format(self.opt_aname))
+        if name.find('.') >= 0:
+            self.opt_fsection = self.name[:name.find('.')]
+            self.opt_fname = self.name[name.find('.') + 1:]
         else:
-            self.opt_arguments = ('--{}'.format(self.opt_aname),)
+            self.opt_fsection = 'root'
+            self.opt_fname = self.name
+
+        if isinstance(opt_name, six.string_types) and len(opt_name) >= 3:
+            if not opt_name.startswith('--'):
+                raise FeildInVaildError(
+                    _('invaild opt_name[{}]').format(opt_name))
+
+            self.opt_aname = opt_name[2:]
+        else:
+            # self.opt_aname = self.name.replace('.', '_')
+            self.opt_aname = self.opt_fname.replace('.', '_')
+
+        self.opt_arguments = ['--{}'.format(self.opt_aname)]
+
+        if self.opt_short_name:
+            self.opt_arguments.append(self.opt_short_name)
 
         # check default
         FeildCheck.field_check(self.name, self.default, self)
@@ -159,14 +168,14 @@ class FeildOption(object):
         elif typedefine in FLOAT_LIST:
             return float
 
+        elif typedefine in BOOL_LIST:
+            return bool
+
         elif typedefine == 'datetime':
             return str
 
         elif typedefine == 'date':
             return str
-
-        elif typedefine == 'boolean':
-            return bool
 
         elif typedefine == 'class':
             return dict
@@ -238,14 +247,14 @@ class FeildCheck(object):
         elif option.type in FLOAT_LIST:
             cls.field_float(*args)
 
+        elif option.type in BOOL_LIST:
+            cls.field_boolean(*args)
+
         elif option.type == 'datetime':
             cls.field_datetime(*args)
 
         elif option.type == 'date':
             cls.field_date(*args)
-
-        elif option.type == 'boolean':
-            cls.field_boolean(*args)
 
         elif option.type == 'class':
             cls.field_class(*args)
@@ -415,14 +424,43 @@ class Options(object):
 
     def __init__(self):
         """__init__."""
-        self.opts_define = {}
+        self.opts_akey = set()
+        self.opts_define = self.load_default_opts()
+        self.opts_default_key = list(self.opts_define.keys())
         self.opts_args = {}
         self.opts_config = {}
 
     def reset_all(self):
-        self.opts_define = {}
+        self.opts_akey = set()
+        self.opts_define = self.load_default_opts()
+        self.opts_default_key = list(self.opts_define.keys())
         self.opts_args = {}
         self.opts_config = {}
+
+    def load_default_opts(self):
+        return {
+            'root.config': FeildOption(
+                'root.config', 'string', 'config_path',
+                default='',
+                regix=r'^(?:(file|etcd)://(.*?))?$',
+                opt_name='--config', opt_short_name='-c',
+                help_desc='config path (file://./config/main.ini|etcd://localhost)'),
+            'root.logging': FeildOption(
+                'root.logging', 'string', 'logging_path',
+                default='',
+                opt_name='--logging', opt_short_name='-l',
+                help_desc='logging config path'),
+            'root.disable_existing_loggers': FeildOption(
+                'root.disable_existing_loggers', 'bool', 'disable_existing_loggers',
+                default=True,
+                opt_name='--disable_existing_loggers', opt_short_name='-ld',
+                help_desc='logging config disable_existing_loggers'),
+            'root.encoding': FeildOption(
+                'root.encoding', 'string', 'encoding',
+                default='utf8',
+                opt_name='--encoding', opt_short_name='-e',
+                help_desc='config encoding'),
+        }
 
     def define(self, name, field_type, desc, default=DefaultUndefine(),
                update='false', maxlen=None,
@@ -430,16 +468,22 @@ class Options(object):
                regix=None, optional=True,
                opt_name=None, opt_short_name=None, help_desc=''):
 
-        if name in self.opts_define:
+        if name in self.opts_define and name not in self.opts_default_key:
             raise FeildInVaildError('{} is defined'.format(name))
 
-        self.opts_define[name] = FeildOption(
+        fo = FeildOption(
             name, field_type, desc, default=default,
             update=update, maxlen=maxlen,
             minlen=minlen, maxval=maxval, minval=minval,
             regix=regix, optional=optional,
             opt_name=opt_name, opt_short_name=opt_short_name,
             help_desc=help_desc)
+
+        if fo.opt_aname in self.opts_akey:
+            raise FeildInVaildError(_('opt_aname is exist[{}]'.format(name)))
+
+        self.opts_akey.add(fo.opt_aname)
+        self.opts_define[name] = fo
 
     def get_opt(self, name, defval=DefaultUndefine()):
         opt = self.opts_define.get(name, None)
@@ -462,26 +506,21 @@ class Options(object):
 
     def parse_opts(self, desc):
         parser = argparse.ArgumentParser(description=desc)
-
-        parser.add_argument(
-            '-c', '--config', default=None,
-            help='config path (file://./config/main.ini|etcd://localhost)')  # noqa
-
-        parser.add_argument(
-            '-e', '--encoding', default='utf8',
-            help='config encoding')  # noqa
-
+        group_parser = {}
         for i in self.opts_define.values():
             assert isinstance(i, FeildOption)
-            parser.add_argument(*i.opt_arguments, default=DefaultUndefine(),
-                                type=i.real_type, help=i.help_desc)
+            if i.opt_fsection != 'root':
+                if i.opt_fsection not in group_parser:
+                    group_parser[i.opt_fsection] = parser.add_argument_group(
+                        _('{} Options').format(i.opt_fsection))
 
-            # if isinstance(i.default, DefaultUndefine):
-            #     parser.add_argument(*i.opt_arguments,
-            #                         type=i.real_type, help=i.help_desc)
-            # else:
-            #     parser.add_argument(*i.opt_arguments, type=i.real_type,
-            #                         default=i.default, help=i.help_desc)
+                _parser = group_parser[i.opt_fsection]
+            else:
+                _parser = parser
+
+            _parser.add_argument(*i.opt_arguments, default=DefaultUndefine(),
+                                 type=i.real_type, help=i.help_desc)
+
         try:
             args = parser.parse_args()
         except Exception as ex:
@@ -495,18 +534,34 @@ class Options(object):
 
         FeildCheck.field_checks(self.opts_args, self.opts_define, False)
 
-        if args.config is None:
-            return
+        # load default otps
+        config_path = self.get_opt('root.config', None)
+        logging_path = self.get_opt('root.logging', None)
+        encoding = self.get_opt('root.encoding', None)
+        disable_existing_loggers = self.get_opt('root.disable_existing_loggers', None)  # noqa
 
-        fpath = re.match(r'^file://(.*?)$', args.config)
-        if fpath:
-            self.parse_opts_file(fpath.group(1), args.encoding)
-            return
+        if logging_path is not None:
+            self.parse_opts_logging(logging_path, encoding,
+                                    disable_existing_loggers)
 
-        fpath = re.match(r'^etcd://(.*?)$', args.config)
-        if fpath:
-            self.parse_opts_etcd(args.config, args.encoding)
-            return
+        if config_path is not None:
+            fpath = re.match(r'^file://(.*?)$', config_path)
+            if fpath:
+                self.parse_opts_file(fpath.group(1), encoding)
+
+            fpath = re.match(r'^etcd://(.*?)$', config_path)
+            if fpath:
+                self.parse_opts_etcd(config_path, encoding)
+
+    def parse_opts_logging(self, path, encoding, disable_existing_loggers):
+        with codecs.open(path, encoding=encoding) as fs:
+            log_fs = configparser.ConfigParser()
+            log_fs.read_file(fs)
+
+            log_config.fileConfig(
+                log_fs,
+                disable_existing_loggers=disable_existing_loggers
+            )
 
     def parse_opts_file(self, path, encoding):
         with codecs.open(path, encoding=encoding) as fs:

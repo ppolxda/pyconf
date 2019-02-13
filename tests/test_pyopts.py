@@ -44,18 +44,37 @@ class TestMathFunc(unittest.TestCase):
         self.assertEqual(opts.get_opt('a.b'), 2222)
 
     @test_init
+    def test_a_same_fields(self):
+        opts.define('a.a', 'string', 'a.a', '1111')
+        try:
+            ex2 = None
+            opts.define('c.a', 'int', 'a.b', 2222)
+        except FeildInVaildError as ex:
+            ex2 = ex
+        self.assertIsInstance(ex2, FeildInVaildError, 'must except')
+
+    @test_init
     def test_b_field_priority(self):
         '''test_b_field_priority
 
         argv > config > get_opt default > default
         '''
-        sys.argv.append('--a_a=3333')
+        sys.argv.append('--a=3333')
         sys.argv.append('--newname=zzzz')
         sys.argv.append('--config=file://./tests/test.ini')
         opts.define('a.a', 'string', 'a.a', '1111')
         opts.define('a.b', 'string', 'a.b', '2222')
         opts.define('a.c', 'string', 'a.c', '5555')
-        opts.define('a.x', 'string', 'a.x', '5555', opt_name='newname')
+        opts.define('a.x', 'string', 'a.x', '5555', opt_name='--newname')
+
+        try:
+            ex2 = None
+            opts.define('a.z', 'string', 'a.x', '5555', opt_name='newname')
+        except FeildInVaildError as ex:
+            ex2 = ex
+
+        self.assertIsInstance(ex2, FeildInVaildError, 'must except')
+
         opts.parse_opts('appname')
         self.assertEqual(opts.get_opt('a.a'), '3333')
         self.assertEqual(opts.get_opt('a.b'), '4444')
@@ -92,7 +111,7 @@ class TestMathFunc(unittest.TestCase):
     #     sys.argv.append('--help')
     #     opts.define('a.a', 'string', 'a.a', '1111', help_desc='test a.a')
     #     opts.define('a.b', 'string', 'a.a', '2222', help_desc='test a.b')
-    #     opts.define('a.c', 'string', 'a.a', '5555', help_desc='test a.c')
+    #     opts.define('b.c', 'string', 'a.a', '5555', help_desc='test a.c')
     #     opts.parse_opts('appname')
 
 
