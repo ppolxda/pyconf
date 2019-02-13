@@ -89,7 +89,7 @@ class FeildOption(object):
                  help_desc='',  update='false', maxlen=None,
                  minlen=None, maxval=None, minval=None,
                  regix=None, optional=True,
-                 opt_short_name=None):
+                 opt_name=None, opt_short_name=None):
         assert field_type in ALL_TYPE_LIST
         assert isinstance(name, six.string_types) and name.count('.') == 1
         self.name = name
@@ -105,7 +105,12 @@ class FeildOption(object):
         self.real_type = self.typedefine_to_type()
         self.opt_fsection = self.name.split('.')[0]
         self.opt_fname = self.name.split('.')[1]
-        self.opt_aname = self.name.replace('.', '_')
+
+        if isinstance(opt_name, six.string_types):
+            self.opt_aname = opt_name
+        else:
+            self.opt_aname = self.name.replace('.', '_')
+
         self.opt_short_name = opt_short_name
         if self.opt_short_name:
             self.opt_arguments = (
@@ -423,7 +428,7 @@ class Options(object):
                update='false', maxlen=None,
                minlen=None, maxval=None, minval=None,
                regix=None, optional=True,
-               opt_short_name=None, help_desc=''):
+               opt_name=None, opt_short_name=None, help_desc=''):
 
         if name in self.opts_define:
             raise FeildInVaildError('{} is defined'.format(name))
@@ -433,7 +438,7 @@ class Options(object):
             update=update, maxlen=maxlen,
             minlen=minlen, maxval=maxval, minval=minval,
             regix=regix, optional=optional,
-            opt_short_name=opt_short_name,
+            opt_name=opt_name, opt_short_name=opt_short_name,
             help_desc=help_desc)
 
     def get_opt(self, name, defval=DefaultUndefine()):

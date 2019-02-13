@@ -50,15 +50,18 @@ class TestMathFunc(unittest.TestCase):
         argv > config > get_opt default > default
         '''
         sys.argv.append('--a_a=3333')
+        sys.argv.append('--newname=zzzz')
         sys.argv.append('--config=file://./tests/test.ini')
         opts.define('a.a', 'string', 'a.a', '1111')
         opts.define('a.b', 'string', 'a.b', '2222')
         opts.define('a.c', 'string', 'a.c', '5555')
+        opts.define('a.x', 'string', 'a.x', '5555', opt_name='newname')
         opts.parse_opts('appname')
         self.assertEqual(opts.get_opt('a.a'), '3333')
         self.assertEqual(opts.get_opt('a.b'), '4444')
         self.assertEqual(opts.get_opt('a.c', '7777'), '7777')
         self.assertEqual(opts.get_opt('a.c'), '5555')
+        self.assertEqual(opts.get_opt('a.x'), 'zzzz')
 
     @test_init
     def test_c_field_typecheck(self):
