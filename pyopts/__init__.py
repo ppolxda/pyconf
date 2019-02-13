@@ -113,6 +113,9 @@ class FeildOption(object):
         else:
             self.opt_arguments = ('--{}'.format(self.opt_aname),)
 
+        # check default
+        FeildCheck.field_check(self.name, self.default, self)
+
     @staticmethod
     def from_dict(**option):
         return FeildOption(**option)
@@ -447,6 +450,7 @@ class Options(object):
             return value
 
         if not isinstance(defval, DefaultUndefine):
+            FeildCheck.field_check(name, defval, opt)
             return defval
 
         return opt.default

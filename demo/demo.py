@@ -1,31 +1,3 @@
-# pyopts
-
-## install
-
-pip 安装
-
-```bash
-pip install git+https://github.com/ppolxda/pyopts
-```
-
-## value priority
-
-argv > config > get_opt default > default
-
-## demo
-
-test.ini
-
-```ini
-[a]
-c=1111
-[d]
-f=22222222
-```
-
-python
-
-```python
 from pyopts import opts
 
 
@@ -43,10 +15,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-```
-
-run shell
-
-```shell
-python demo.py --config=file://./demo.ini --a_c=9
-```

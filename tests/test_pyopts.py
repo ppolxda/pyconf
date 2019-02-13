@@ -30,7 +30,7 @@ def test_init(func):
 class TestMathFunc(unittest.TestCase):
     """Test mathfuc.py"""
 
-    DEFARGS = copy.deepcopy(sys.argv)
+    DEFARGS = [sys.argv[0]]
 
     def reset_sysargv(self):
         sys.argv = copy.deepcopy(self.DEFARGS)
@@ -38,10 +38,10 @@ class TestMathFunc(unittest.TestCase):
     @test_init
     def test_a_default_value(self):
         opts.define('a.a', 'string', 'a.a', '1111')
-        opts.define('a.b', 'int', 'a.b', '2222')
+        opts.define('a.b', 'int', 'a.b', 2222)
         opts.parse_opts('appname')
         self.assertEqual(opts.get_opt('a.a'), '1111')
-        self.assertEqual(opts.get_opt('a.b'), '2222')
+        self.assertEqual(opts.get_opt('a.b'), 2222)
 
     @test_init
     def test_b_field_priority(self):
@@ -64,8 +64,19 @@ class TestMathFunc(unittest.TestCase):
     def test_c_field_typecheck(self):
         '''test_c_field_typecheck'''
         sys.argv.append('--config=file://./tests/test.ini')
-        opts.define('a.f', 'string', 'a.f', '5555', maxlen=3)
         ex2 = None
+        try:
+            opts.define('a.f', 'string', 'a.f', '5555', maxlen=3)
+        except FeildInVaildError as ex:
+            ex2 = ex
+
+        self.assertIsInstance(ex2, FeildInVaildError, 'must except')
+
+    @test_init
+    def test_c_field_typecheck2(self):
+        sys.argv.append('--config=file://./tests/test.ini')
+        ex2 = None
+        opts.define('a.f', 'string', 'a.f', '55', maxlen=3)
         try:
             opts.parse_opts('appname')
         except FeildInVaildError as ex:

@@ -2,18 +2,24 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python1",
+            "name": "Python",
             "type": "python",
             "request": "launch",
+            "cwd": "${workspaceFolder}",
             "program": "${file}",
             "console": "integratedTerminal"
         },
         {
-            "name": "Python2",
+            "name": "run demo",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/demo.py",
+            "console": "integratedTerminal",
+            "args": [
+                "--config=file://${workspaceFolder}/demo/demo.ini",
+                "--a_c=9"
+            ]
         }
     ]
 }
