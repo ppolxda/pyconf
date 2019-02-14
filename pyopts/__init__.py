@@ -62,13 +62,16 @@ class FeildOption(object):
     class Options(object):
 
         def __init__(self, update='false', maxlen=None,
-                     minlen=None, maxval=None, minval=None, regix=None):
+                     minlen=None, maxval=None, minval=None,
+                     regix=None, allow_none=None, optional=True):
             self.update = update
             self.maxlen = maxlen
             self.minlen = minlen
             self.maxval = maxval
             self.minval = minval
             self.regix = regix
+            self.allow_none = allow_none
+            self.optional = optional
 
         def to_dict(self):
             return {
@@ -78,19 +81,63 @@ class FeildOption(object):
                 'maxval': self.maxval,
                 'minval': self.minval,
                 'regix': self.regix,
+                'allow_none': self.allow_none,
+                'optional': self.optional,
             }
 
         def __str__(self):
             return json.dumps(self.to_dict())
 
-        def __repr__(self):
-            return self.__str__()
+    class OptOptions(object):
+
+        def __init__(self, name, opt_name=None,
+                     opt_short_name=None, help_desc=''):
+            self.opt_name = opt_name
+            self.opt_short_name = opt_short_name
+            self.help_desc = help_desc
+
+            if name.find('.') >= 0:
+                self.opt_fsection = name[:name.find('.')]
+                self.opt_fname = name[name.find('.') + 1:]
+            else:
+                self.opt_fsection = 'root'
+                self.opt_fname = name
+
+            if isinstance(opt_name, six.string_types) and len(opt_name) >= 3:
+                if not opt_name.startswith('--'):
+                    raise FeildInVaildError(
+                        _('invaild opt_name[{}]').format(opt_name))
+
+                self.opt_aname = opt_name[2:]
+            else:
+                # self.opt_aname = self.name.replace('.', '_')
+                self.opt_aname = self.opt_fname.replace('.', '_')
+
+            self.opt_arguments = ['--{}'.format(self.opt_aname)]
+
+            if self.opt_short_name:
+                self.opt_arguments.append(self.opt_short_name)
+
+        def to_dict(self):
+            return {
+                'opt_name': self.opt_name,
+                'opt_short_name': self.opt_short_name,
+                'opt_fsection': self.opt_fsection,
+                'opt_fname': self.opt_fname,
+                'opt_aname': self.opt_aname,
+                'opt_arguments': self.opt_arguments,
+                'help_desc': self.help_desc,
+            }
+
+        def __str__(self):
+            return json.dumps(self.to_dict())
 
     def __init__(self, name, field_type, desc, default=DefaultUndefine(),
-                 help_desc='', update='false', maxlen=None,
+                 update='false', maxlen=None,
                  minlen=None, maxval=None, minval=None,
-                 regix=None, optional=True,
-                 opt_name=None, opt_short_name=None):
+                 regix=None, optional=True, allow_none=False,
+                 opt_name=None, opt_short_name=None,
+                 help_desc=''):
         assert field_type in ALL_TYPE_LIST
         assert isinstance(name, six.string_types)
         self.name = name
@@ -98,34 +145,13 @@ class FeildOption(object):
         self.desc = desc
         self.default = default
         self.help_desc = help_desc
-        self.optional = optional
+        self.real_type = self.typedefine_to_type()
         self.options = self.Options(update, maxlen,
                                     minlen, maxval, minval,
-                                    regix)
+                                    regix, allow_none, optional)
 
-        self.real_type = self.typedefine_to_type()
-        self.opt_short_name = opt_short_name
-        if name.find('.') >= 0:
-            self.opt_fsection = self.name[:name.find('.')]
-            self.opt_fname = self.name[name.find('.') + 1:]
-        else:
-            self.opt_fsection = 'root'
-            self.opt_fname = self.name
-
-        if isinstance(opt_name, six.string_types) and len(opt_name) >= 3:
-            if not opt_name.startswith('--'):
-                raise FeildInVaildError(
-                    _('invaild opt_name[{}]').format(opt_name))
-
-            self.opt_aname = opt_name[2:]
-        else:
-            # self.opt_aname = self.name.replace('.', '_')
-            self.opt_aname = self.opt_fname.replace('.', '_')
-
-        self.opt_arguments = ['--{}'.format(self.opt_aname)]
-
-        if self.opt_short_name:
-            self.opt_arguments.append(self.opt_short_name)
+        self.opts = self.OptOptions(
+            name, opt_name, opt_short_name, help_desc)
 
         # check default
         FeildCheck.field_check(self.name, self.default, self)
@@ -140,8 +166,8 @@ class FeildOption(object):
             'default': self.default,
             'type': self.type,
             'desc': self.desc,
-            'optional': self.optional,
-            'options': self.options.to_dict()
+            'options': self.options.to_dict(),
+            'opts': self.opts.to_dict()
         }
 
     def __str__(self):
@@ -232,7 +258,10 @@ class FeildCheck(object):
         assert isinstance(option, FeildOption)
         args = (option, key, val)
 
-        if option.type in JSON_STRING:
+        if val is None and option.options.allow_none:
+            pass
+
+        elif option.type in JSON_STRING:
             cls.field_json(*args)
 
         elif option.type in STRING_LIST:
@@ -463,35 +492,35 @@ class Options(object):
         }
 
     def add_define(self, fopt):
-        if isinstance(fopt, FeildOption):
+        if not isinstance(fopt, FeildOption):
             raise FeildInVaildError('fopt invaild')
 
         if fopt.name in self.opts_define and \
                 fopt.name not in self.opts_default_key:
             raise FeildInVaildError(_('{} is defined').format(fopt.name))
 
-        if fopt.opt_aname in self.opts_akey:
+        if fopt.opts.opt_aname in self.opts_akey:
             raise FeildInVaildError(
                 _('opt_aname is exist[{}]'.format(fopt.name)))
 
-        self.opts_akey.add(fopt.opt_aname)
+        self.opts_akey.add(fopt.opts.opt_aname)
         self.opts_define[fopt.name] = fopt
 
     def define(self, name, field_type, desc, default=DefaultUndefine(),
                update='false', maxlen=None,
                minlen=None, maxval=None, minval=None,
-               regix=None, optional=True,
+               regix=None, optional=True, allow_none=False,
                opt_name=None, opt_short_name=None, help_desc=''):
 
         fo = FeildOption(
             name, field_type, desc, default=default,
             update=update, maxlen=maxlen,
             minlen=minlen, maxval=maxval, minval=minval,
-            regix=regix, optional=optional,
+            regix=regix, optional=optional, allow_none=allow_none,
             opt_name=opt_name, opt_short_name=opt_short_name,
             help_desc=help_desc)
 
-        self.append_define(fo)
+        self.add_define(fo)
 
     def get_opt(self, name, defval=DefaultUndefine()):
         opt = self.opts_define.get(name, None)
@@ -517,16 +546,18 @@ class Options(object):
         group_parser = {}
         for i in self.opts_define.values():
             assert isinstance(i, FeildOption)
-            if i.opt_fsection != 'root':
-                if i.opt_fsection not in group_parser:
-                    group_parser[i.opt_fsection] = parser.add_argument_group(
-                        _('{} Options').format(i.opt_fsection))
+            opt_fsection = i.opts.opt_fsection
+            if opt_fsection != 'root':
+                if opt_fsection not in group_parser:
+                    group_parser[opt_fsection] = parser.add_argument_group(
+                        _('{} Options').format(opt_fsection))
 
-                _parser = group_parser[i.opt_fsection]
+                _parser = group_parser[opt_fsection]
             else:
                 _parser = parser
 
-            _parser.add_argument(*i.opt_arguments, default=DefaultUndefine(),
+            _parser.add_argument(*i.opts.opt_arguments,
+                                 default=DefaultUndefine(),
                                  type=i.real_type, help=i.help_desc)
 
         try:
@@ -536,7 +567,7 @@ class Options(object):
 
         for i in self.opts_define.values():
             assert isinstance(i, FeildOption)
-            value = getattr(args, i.opt_aname)
+            value = getattr(args, i.opts.opt_aname)
             if not isinstance(value, DefaultUndefine):
                 self.opts_args[i.name] = value
 
@@ -580,13 +611,16 @@ class Options(object):
             assert isinstance(i, FeildOption)
             if i.real_type == int:
                 value = self.__get_value_int_def(
-                    fs_config, i.opt_fsection, i.opt_fname, DefaultUndefine())
+                    fs_config, i.opts.opt_fsection,
+                    i.opts.opt_fname, DefaultUndefine())
             elif i.real_type == bool:
                 value = self.__get_value_boolen_def(
-                    fs_config, i.opt_fsection, i.opt_fname, DefaultUndefine())
+                    fs_config, i.opts.opt_fsection,
+                    i.opts.opt_fname, DefaultUndefine())
             elif i.real_type == str:
                 value = self.__get_value_string_def(
-                    fs_config, i.opt_fsection, i.opt_fname, DefaultUndefine())
+                    fs_config, i.opts.opt_fsection,
+                    i.opts.opt_fname, DefaultUndefine())
             else:
                 raise FeildInVaildError('parse_opts_file error')
 
