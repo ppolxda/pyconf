@@ -444,14 +444,14 @@ class Options(object):
                 default='',
                 regix=r'^(?:(file|etcd)://(.*?))?$',
                 opt_name='--config', opt_short_name='-c',
-                help_desc='config path (file://./config/main.ini|etcd://localhost)'),
+                help_desc='config path (file://./config/main.ini|etcd://localhost)'),  # noqa
             'root.logging': FeildOption(
                 'root.logging', 'string', 'logging_path',
                 default='',
                 opt_name='--logging', opt_short_name='-l',
                 help_desc='logging config path'),
             'root.disable_existing_loggers': FeildOption(
-                'root.disable_existing_loggers', 'bool', 'disable_existing_loggers',
+                'root.disable_existing_loggers', 'bool', 'disable_existing_loggers',  # noqa
                 default=True,
                 opt_name='--disable_existing_loggers', opt_short_name='-ld',
                 help_desc='logging config disable_existing_loggers'),
@@ -462,14 +462,26 @@ class Options(object):
                 help_desc='config encoding'),
         }
 
+    def add_define(self, fopt):
+        if isinstance(fopt, FeildOption):
+            raise FeildInVaildError('fopt invaild')
+
+        if fopt.name in self.opts_define and \
+                fopt.name not in self.opts_default_key:
+            raise FeildInVaildError(_('{} is defined').format(fopt.name))
+
+        if fopt.opt_aname in self.opts_akey:
+            raise FeildInVaildError(
+                _('opt_aname is exist[{}]'.format(fopt.name)))
+
+        self.opts_akey.add(fopt.opt_aname)
+        self.opts_define[fopt.name] = fopt
+
     def define(self, name, field_type, desc, default=DefaultUndefine(),
                update='false', maxlen=None,
                minlen=None, maxval=None, minval=None,
                regix=None, optional=True,
                opt_name=None, opt_short_name=None, help_desc=''):
-
-        if name in self.opts_define and name not in self.opts_default_key:
-            raise FeildInVaildError('{} is defined'.format(name))
 
         fo = FeildOption(
             name, field_type, desc, default=default,
@@ -479,11 +491,7 @@ class Options(object):
             opt_name=opt_name, opt_short_name=opt_short_name,
             help_desc=help_desc)
 
-        if fo.opt_aname in self.opts_akey:
-            raise FeildInVaildError(_('opt_aname is exist[{}]'.format(name)))
-
-        self.opts_akey.add(fo.opt_aname)
-        self.opts_define[name] = fo
+        self.append_define(fo)
 
     def get_opt(self, name, defval=DefaultUndefine()):
         opt = self.opts_define.get(name, None)
