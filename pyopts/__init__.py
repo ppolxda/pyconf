@@ -233,7 +233,7 @@ class FeildCheck(object):
 
         for key, val in options.items():
             if isinstance(val, FeildOption) and \
-                    (not val.optional) and \
+                    (not val.options.optional) and \
                     key not in inputs:
                 raise FeildInVaildError(
                     _('Not enough arguments[{}]').format(key))
