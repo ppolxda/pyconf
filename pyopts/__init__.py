@@ -628,6 +628,10 @@ class Options(object):
                 value = self.__get_value_string_def(
                     fs_config, i.opts.opt_fsection,
                     i.opts.opt_fname, DefaultUndefine())
+            elif i.real_type == float:
+                value = self.__get_value_float_def(
+                    fs_config, i.opts.opt_fsection,
+                    i.opts.opt_fname, DefaultUndefine())
             else:
                 raise FeildInVaildError('parse_opts_file error')
 
