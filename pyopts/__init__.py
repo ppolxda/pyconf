@@ -458,6 +458,7 @@ class Options(object):
         self.opts_default_key = list(self.opts_define.keys())
         self.opts_args = {}
         self.opts_config = {}
+        self.is_parse = False
 
     def reset_all(self):
         self.opts_akey = set()
@@ -465,6 +466,7 @@ class Options(object):
         self.opts_default_key = list(self.opts_define.keys())
         self.opts_args = {}
         self.opts_config = {}
+        self.is_parse = False
 
     def load_default_opts(self):
         return {
@@ -523,19 +525,22 @@ class Options(object):
         self.add_define(fo)
 
     def get_opt(self, name, defval=DefaultUndefine()):
+        if name not in self.opts_default_key and not self.is_parse:
+            raise FeildInVaildError('not run parse_opts')
+
         opt = self.opts_define.get(name, None)
         if opt is None:
             raise FeildInVaildError('option not found')
 
         value = self.opts_args.get(name, defval)
-        if not isinstance(value, DefaultUndefine):
+        if value is not None and not isinstance(value, DefaultUndefine):
             return value
 
         value = self.opts_config.get(name, defval)
-        if not isinstance(value, DefaultUndefine):
+        if value is not None and not isinstance(value, DefaultUndefine):
             return value
 
-        if not isinstance(defval, DefaultUndefine):
+        if value is not None and not isinstance(defval, DefaultUndefine):
             FeildCheck.field_check(name, defval, opt)
             return defval
 
@@ -591,6 +596,8 @@ class Options(object):
             fpath = re.match(r'^etcd://(.*?)$', config_path)
             if fpath:
                 self.parse_opts_etcd(config_path, encoding)
+
+        self.is_parse = True
 
     def parse_opts_logging(self, path, encoding, disable_existing_loggers):
         with codecs.open(path, encoding=encoding) as fs:
