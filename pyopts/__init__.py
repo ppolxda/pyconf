@@ -478,8 +478,8 @@ class Options(object):
                 default=None,
                 regix=r'^(?:(file|etcd)://(.*?))?$',
                 opt_name='--config', opt_short_name='-c',
-                help_desc='config path (file://./config/main.ini|etcd://localhost)',
-                allow_none=True),  # noqa
+                help_desc='config path (file://./config/main.ini|etcd://localhost)',  # noqa
+                allow_none=True),
             'root.logging': FeildOption(
                 'root.logging', 'string', 'logging_path',
                 default=None,
