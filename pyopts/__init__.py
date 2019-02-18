@@ -652,9 +652,11 @@ class Options(object):
     def print_config(self, key_weight=32):
         assert isinstance(key_weight, int)
         fmt = '-- {:<' + str(key_weight) + '} -- {}'
-        reuslt = ['--------------------------------------']
+        reuslt = ['----------- pyopts start ---------------------------']
         for key in self.opts_define.keys():
             reuslt.append(fmt.format(key, self.get_opt(key)))
+
+        reuslt.append('----------- pyopts end - --------------------------')
         return '\n'.join(reuslt)
 
     # ----------------------------------------------
