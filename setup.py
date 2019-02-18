@@ -15,7 +15,7 @@ from setuptools import setup, find_packages, findall
 
 setup(
     name="pyopts",
-    version="0.0.8",
+    version="0.0.9",
     install_requires=[
         'six',
     ],

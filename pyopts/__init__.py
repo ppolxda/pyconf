@@ -595,13 +595,20 @@ class Options(object):
                                     disable_existing_loggers)
 
         if config_path is not None:
+            is_match = False
             fpath = re.match(r'^file://(.*?)$', config_path)
             if fpath:
                 self.parse_opts_file(fpath.group(1), encoding)
+                is_match = True
 
             fpath = re.match(r'^etcd://(.*?)$', config_path)
             if fpath:
                 self.parse_opts_etcd(config_path, encoding)
+                is_match = True
+
+            if not is_match:
+                raise TypeError(
+                    _('root.config fmt error[{}]').format(config_path))
 
         self.is_parse = True
 
