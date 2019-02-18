@@ -91,10 +91,12 @@ class FeildOption(object):
     class OptOptions(object):
 
         def __init__(self, name, opt_name=None,
-                     opt_short_name=None, help_desc=''):
+                     opt_short_name=None,
+                     is_print=True, help_desc=''):
             self.opt_name = opt_name
             self.opt_short_name = opt_short_name
             self.help_desc = help_desc
+            self.is_print = is_print
 
             if name.find('.') >= 0:
                 self.opt_fsection = name[:name.find('.')]
@@ -126,6 +128,7 @@ class FeildOption(object):
                 'opt_fname': self.opt_fname,
                 'opt_aname': self.opt_aname,
                 'opt_arguments': self.opt_arguments,
+                'is_print': self.is_print,
                 'help_desc': self.help_desc,
             }
 
@@ -137,7 +140,7 @@ class FeildOption(object):
                  minlen=None, maxval=None, minval=None,
                  regix=None, optional=True, allow_none=False,
                  opt_name=None, opt_short_name=None,
-                 help_desc=''):
+                 is_print=True, help_desc=''):
         assert field_type in ALL_TYPE_LIST
         assert isinstance(name, six.string_types)
         self.name = name
@@ -151,7 +154,7 @@ class FeildOption(object):
                                     regix, allow_none, optional)
 
         self.opts = self.OptOptions(
-            name, opt_name, opt_short_name, help_desc)
+            name, opt_name, opt_short_name, is_print, help_desc)
 
         # check default
         FeildCheck.field_check(self.name, self.default, self)
@@ -472,15 +475,17 @@ class Options(object):
         return {
             'root.config': FeildOption(
                 'root.config', 'string', 'config_path',
-                default='',
+                default=None,
                 regix=r'^(?:(file|etcd)://(.*?))?$',
                 opt_name='--config', opt_short_name='-c',
-                help_desc='config path (file://./config/main.ini|etcd://localhost)'),  # noqa
+                help_desc='config path (file://./config/main.ini|etcd://localhost)',
+                allow_none=True),  # noqa
             'root.logging': FeildOption(
                 'root.logging', 'string', 'logging_path',
-                default='',
+                default=None,
                 opt_name='--logging', opt_short_name='-l',
-                help_desc='logging config path'),
+                help_desc='logging config path',
+                allow_none=True),
             'root.disable_existing_loggers': FeildOption(
                 'root.disable_existing_loggers', 'bool', 'disable_existing_loggers',  # noqa
                 default=True,
@@ -512,7 +517,8 @@ class Options(object):
                update='false', maxlen=None,
                minlen=None, maxval=None, minval=None,
                regix=None, optional=True, allow_none=False,
-               opt_name=None, opt_short_name=None, help_desc=''):
+               opt_name=None, opt_short_name=None,
+               is_print=True, help_desc=''):
 
         fo = FeildOption(
             name, field_type, desc, default=default,
@@ -520,7 +526,7 @@ class Options(object):
             minlen=minlen, maxval=maxval, minval=minval,
             regix=regix, optional=optional, allow_none=allow_none,
             opt_name=opt_name, opt_short_name=opt_short_name,
-            help_desc=help_desc)
+            is_print=is_print, help_desc=help_desc)
 
         self.add_define(fo)
 
@@ -642,6 +648,14 @@ class Options(object):
 
     def parse_opts_etcd(self, path, encoding):
         pass
+
+    def print_config(self, key_weight=32):
+        assert isinstance(key_weight, int)
+        fmt = '-- {:<' + str(key_weight) + '} -- {}'
+        reuslt = ['--------------------------------------']
+        for key in self.opts_define.keys():
+            reuslt.append(fmt.format(key, self.get_opt(key)))
+        return '\n'.join(reuslt)
 
     # ----------------------------------------------
     #        get file

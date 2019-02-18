@@ -113,6 +113,7 @@ class TestMathFunc(unittest.TestCase):
     #     opts.define('a.b', 'string', 'a.a', '2222', help_desc='test a.b')
     #     opts.define('b.c', 'string', 'a.a', '5555', help_desc='test a.c')
     #     opts.parse_opts('appname')
+    #     print(opts.print_config())
 
 
 if __name__ == '__main__':
