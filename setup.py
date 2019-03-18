@@ -29,7 +29,7 @@ setup(
     #     ]
     # },
     # scripts=bin_list_build(),
-    python_requires=">=2.7,<=3.7.*",
+    python_requires=">=2.7",
     author="asdas",
     author_email="sa@sa.com",
     description="This is an pyopts Package",
