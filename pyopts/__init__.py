@@ -9,6 +9,7 @@
 import re
 import six
 import json
+import copy
 import codecs
 import argparse
 from logging import config as log_config
@@ -17,6 +18,7 @@ try:
 except ImportError:
     import ConfigParser as configparser
 
+PNAME_DEFINE = '{pname}'
 BOOL_LIST = {'boolean', 'bool'}
 INT_LIST = {'int', 'int32', 'int64', 'uint16'}
 JSON_STRING = {'jsonString', 'json_string', 'jsonstring'}
@@ -36,14 +38,12 @@ def _(val):
 
 
 def is_date(val):
-    u"""是否是日期."""
     if not isinstance(val, six.string_types):
         return False
     return re.match(r'[0-9]{4}[0-9]{2}[0-9]{2}', val) is not None
 
 
 def is_datetime(val):
-    u"""是否是整型数."""
     if not isinstance(val, six.string_types):
         return False
     return re.match(r'[0-9]{4}[0-9]{2}[0-9]{2}T[0-9]{2}[0-9]{2}[0-9]{2}', val) is not None  # noqa
@@ -98,7 +98,7 @@ class FeildOption(object):
             self.help_desc = help_desc
             self.is_print = is_print
 
-            if name.find('.') >= 0:
+            if '.' in name:
                 self.opt_fsection = name[:name.find('.')]
                 self.opt_fname = name[name.find('.') + 1:]
             else:
@@ -108,7 +108,8 @@ class FeildOption(object):
             if isinstance(opt_name, six.string_types) and len(opt_name) >= 3:
                 if not opt_name.startswith('--'):
                     raise FeildInVaildError(
-                        _('invaild opt_name[{}]').format(opt_name))
+                        _('invaild opt_name[{}]').format(opt_name)
+                    )
 
                 self.opt_aname = opt_name[2:]
             else:
@@ -154,10 +155,22 @@ class FeildOption(object):
                                     regix, allow_none, optional)
 
         self.opts = self.OptOptions(
-            name, opt_name, opt_short_name, is_print, help_desc)
+            name, opt_name, opt_short_name, is_print, help_desc
+        )
 
         # check default
         FeildCheck.field_check(self.name, self.default, self)
+
+    def pname_replace(self, pname):
+        _new = copy.deepcopy(self)
+        _name = self.name.replace(PNAME_DEFINE, pname)
+        _new.opts = self.OptOptions(
+            _name, _new.opts.opt_name,
+            _new.opts.opt_short_name,
+            _new.opts.is_print,
+            _new.opts.help_desc
+        )
+        return _new
 
     @staticmethod
     def from_dict(**option):
@@ -294,7 +307,6 @@ class FeildCheck(object):
         elif option.type == 'any':
             pass
 
-        # # 如果是枚举类型
         # elif len(option.type) > 4 and (
         #         option.type[:4] == 'Enum' or
         #         option.type[-4:] == 'Enum'):
@@ -343,11 +355,6 @@ class FeildCheck(object):
         if maxval is not None and val > int(maxval):
             raise FeildInVaildError(
                 _('value more then maxval[{}][max={}]').format(key, maxval))
-
-    # @staticmethod
-    # def field_class(options, key, val):
-    #     if not isinstance(val, dict):
-    #         raise FeildInVaildError(_('无效输入类型[{}]').format(key))
 
     @staticmethod
     def field_json(opt, key, val):
@@ -463,6 +470,10 @@ class Options(object):
         self.opts_config = {}
         self.is_parse = False
 
+        self.pnane = ''
+        self.popts_define = None
+        self.popts_default_key = None
+
     def reset_all(self):
         self.opts_akey = set()
         self.opts_define = self.load_default_opts()
@@ -470,6 +481,10 @@ class Options(object):
         self.opts_args = {}
         self.opts_config = {}
         self.is_parse = False
+
+        self.pnane = ''
+        self.popts_define = None
+        self.popts_default_key = None
 
     def load_default_opts(self):
         return {
@@ -552,10 +567,20 @@ class Options(object):
 
         return opt.default
 
-    def parse_opts(self, desc):
-        parser = argparse.ArgumentParser(description=desc)
+    def parse_opts(self, pnane, desc=''):
+        if self.is_parse:
+            return
+
         group_parser = {}
-        for i in self.opts_define.values():
+        popts_define = {
+            key: val.pname_replace(pnane)
+            for key, val in self.opts_define.items()
+        }
+        popts_default_key = list(popts_define.keys())
+        parser = argparse.ArgumentParser(description=desc)
+
+        # add argparse
+        for i in popts_define.values():
             assert isinstance(i, FeildOption)
             opt_fsection = i.opts.opt_fsection
             if opt_fsection != 'root':
@@ -576,13 +601,14 @@ class Options(object):
         except Exception as ex:
             raise FeildInVaildError(ex)
 
-        for i in self.opts_define.values():
+        # get argument result
+        for i in popts_define.values():
             assert isinstance(i, FeildOption)
             value = getattr(args, i.opts.opt_aname)
             if not isinstance(value, DefaultUndefine):
                 self.opts_args[i.name] = value
 
-        FeildCheck.field_checks(self.opts_args, self.opts_define, False)
+        FeildCheck.field_checks(self.opts_args, popts_define, False)
 
         # load default otps
         config_path = self.get_opt('root.config', None)
@@ -594,22 +620,27 @@ class Options(object):
             self.parse_opts_logging(logging_path, encoding,
                                     disable_existing_loggers)
 
+        # load config in file or etcd
         if config_path is not None:
             is_match = False
             fpath = re.match(r'^file://(.*?)$', config_path)
             if fpath:
-                self.parse_opts_file(fpath.group(1), encoding)
+                self.parse_opts_file(fpath.group(1), encoding, popts_define)
                 is_match = True
 
             fpath = re.match(r'^etcd://(.*?)$', config_path)
             if fpath:
-                self.parse_opts_etcd(config_path, encoding)
+                self.parse_opts_etcd(config_path, encoding, popts_define)
                 is_match = True
 
             if not is_match:
                 raise TypeError(
-                    _('root.config fmt error[{}]').format(config_path))
+                    _('root.config fmt error[{}]').format(config_path)
+                )
 
+        self.pnane = pnane
+        self.popts_define = popts_define
+        self.popts_default_key = list(popts_define.keys())
         self.is_parse = True
 
     def parse_opts_logging(self, path, encoding, disable_existing_loggers):
@@ -622,12 +653,19 @@ class Options(object):
                 disable_existing_loggers=disable_existing_loggers
             )
 
-    def parse_opts_file(self, path, encoding):
+    def parse_opts_file(self, path, encoding, popts_define=None):
         with codecs.open(path, encoding=encoding) as fs:
             fs_config = configparser.ConfigParser()
             fs_config.read_file(fs)
 
-        for i in self.opts_define.values():
+        if popts_define:
+            _popts_define = popts_define
+        elif self.popts_define:
+            _popts_define = self.popts_define
+        else:
+            _popts_define = self.opts_define
+
+        for i in _popts_define.values():
             assert isinstance(i, FeildOption)
             if i.real_type == int:
                 value = self.__get_value_int_def(
@@ -653,8 +691,8 @@ class Options(object):
 
         FeildCheck.field_checks(self.opts_config, self.opts_define, False)
 
-    def parse_opts_etcd(self, path, encoding):
-        pass
+    def parse_opts_etcd(self, path, encoding, popts_define=None):
+        raise NotImplementedError
 
     def print_config(self, key_weight=32):
         assert isinstance(key_weight, int)
@@ -672,7 +710,6 @@ class Options(object):
 
     @staticmethod
     def __get_value_boolen_def(fs_config, section, option, defval):
-        u"""获取boolen字段配置."""
         try:
             return fs_config.getboolean(section, option)
         except configparser.ParsingError:
@@ -682,7 +719,6 @@ class Options(object):
 
     @staticmethod
     def __get_value_int_def(fs_config, section, option, defval):
-        u"""获取int字段配置."""
         try:
             return fs_config.getint(section, option)
         except configparser.ParsingError:
@@ -692,7 +728,6 @@ class Options(object):
 
     @staticmethod
     def __get_value_float_def(fs_config, section, option, defval):
-        u"""获取int字段配置."""
         try:
             return fs_config.getfloat(section, option)
         except configparser.ParsingError:
@@ -702,7 +737,6 @@ class Options(object):
 
     @staticmethod
     def __get_value_string_def(fs_config, section, option, defval):
-        u"""获取string字段配置."""
         try:
             return fs_config.get(section, option)
         except configparser.ParsingError:
