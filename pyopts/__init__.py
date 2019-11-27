@@ -747,8 +747,65 @@ class Options(object):
 
 opts = Options()
 
+
+class RootSettings(object):
+
+    # ----------------------------------------------
+    #        root
+    # ----------------------------------------------
+
+    ROOT_LOGGING = 'root.logging'
+    ROOT_LOGGING_OPT = FeildOption(
+        ROOT_LOGGING, 'string',
+        default=None,
+        desc='logging path',
+        help_desc='logging path',
+        opt_short_name='-l',
+        allow_none=True
+    )
+
+    ROOT_CONFIG = 'root.config'
+    ROOT_CONFIG_OPT = FeildOption(
+        ROOT_CONFIG, 'string',
+        default=None,
+        desc='main config path',
+        help_desc=(
+            'main config path'
+            '(file://./config/main.ini|etcd://localhost)'
+        ),
+        opt_short_name='-c',
+        allow_none=True
+    )
+
+    ROOT_DISABLE_EXISTING_LOGGERS = 'root.disable_existing_loggers'
+    ROOT_DISABLE_EXISTING_LOGGERS_OPT = FeildOption(
+        ROOT_DISABLE_EXISTING_LOGGERS, 'bool',
+        default=False,
+        desc='disable existing loggers',
+        help_desc='disable existing loggers',
+        opt_short_name='-ld'
+    )
+
+    @staticmethod
+    def print_config():
+        return opts.print_config(40)
+
+    @classmethod
+    def init_opt(cls, name):
+        if opts.is_parse:
+            return
+
+        for i in dir(cls):
+            field = getattr(cls, i)
+            if isinstance(field, FeildOption):
+                opts.add_define(field)
+
+        opts.parse_opts(name)
+
+
 __all__ = [
     'FeildInVaildError',
     'FeildOption',
+    'RootSettings',
     'opts'
 ]
