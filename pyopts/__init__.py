@@ -616,12 +616,12 @@ class Options(object):
         encoding = self.get_opt('root.encoding', None)
         disable_existing_loggers = self.get_opt('root.disable_existing_loggers', None)  # noqa
 
-        if logging_path is not None:
+        if logging_path and isinstance(logging_path, six.string_types):
             self.parse_opts_logging(logging_path, encoding,
                                     disable_existing_loggers)
 
         # load config in file or etcd
-        if config_path is not None:
+        if config_path and isinstance(config_path, six.string_types):
             is_match = False
             fpath = re.match(r'^file://(.*?)$', config_path)
             if fpath:
